@@ -1,7 +1,7 @@
 import unittest
 from operator import truediv
 
-from futoshiki.encoding import variable_id, encode_cells, exactly_one, encode_columns, encode_rows
+from futoshiki.encoding import variable_id, encode_cells, exactly_one, encode_columns, encode_rows, encode_inequalities, encode_inequality
 
 
 def board_assignment(board):
@@ -147,6 +147,69 @@ class TestRowColumnEncoding(unittest.TestCase):
         self.assertFalse(satisfies(encode_columns(3), assignment))
 
 
+class TestInequalityEncoding(unittest.TestCase):
+
+    def test_less_than_clauses(self):
+        clauses = encode_inequality(3, 0, 0, "<", 0, 1)
+        self.assertEqual(clauses, [
+            [-1, -4],
+            [-2, -4],
+            [-2, -5],
+            [-3, -4],
+            [-3, -5],
+            [-3, -6],
+        ])
+
+    def test_inequalit_clause_count(self):
+        for n in (2, 3, 4, 5):
+            clauses = encode_inequality(n, 0, 0, "<", 0, 1)
+
+            self.assertEqual(len(clauses), n * (n + 1) //2)
+
+    def test_valid_inequalities(self):
+        board = [
+            [1, 2, 3],
+            [2, 3, 1],
+            [3, 1, 2],
+        ]
+
+        inequalities = [
+            (0, 0, "<", 0, 1),
+            (0, 2, ">", 1, 2),
+            (0, 1, "<", 1, 1),
+        ]
+
+        clauses = encode_inequalities(3, inequalities)
+
+        self.assertTrue(satisfies(clauses, board_assignment(board)))
+
+    def test_violated_inequality(self):
+        board = [
+            [1, 2, 3],
+            [2, 3, 1],
+            [3, 1, 2],
+        ]
+
+        clauses = encode_inequality(3, 0, 0, ">", 0, 1)
+
+        self.assertFalse(satisfies(clauses, board_assignment(board)))
+
+    def test_equal_values(self):
+        board = [
+            [1, 1, 3],
+            [2, 3, 1],
+            [3, 2, 2],
+        ]
+
+        clauses = encode_inequality(3, 0, 0, "<", 0, 1)
+
+        self.assertFalse(
+            satisfies(clauses, board_assignment(board))
+        )
+
+    def test_invalid_operator(self):
+        with self.assertRaises(ValueError):
+            encode_inequality(3, 0, 0, "=", 0, 1)
 
 
 if __name__ == '__main__':
