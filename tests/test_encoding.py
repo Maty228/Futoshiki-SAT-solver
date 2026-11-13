@@ -1,7 +1,30 @@
 import unittest
 from operator import truediv
 
-from futoshiki.encoding import variable_id, encode_cells
+from futoshiki.encoding import variable_id, encode_cells, exactly_one, encode_columns, encode_rows
+
+
+def board_assignment(board):
+    """Convert a filled board into a set of true SAT variables."""
+
+    n = len(board)
+
+    return {
+        variable_id(row, col, board[row][col], n)
+        for row in range(n)
+        for col in range(n)
+    }
+
+def satisfies(clauses, true_variables):
+    """Check whether an assignment satisfies all CNF clauses."""
+    return all(
+        any(
+            literal in true_variables if literal > 0
+            else -literal not in true_variables
+            for literal in clause
+        )
+        for clause in clauses
+    )
 
 
 class TestVariableMapping(unittest.TestCase):
@@ -60,13 +83,71 @@ class TestCellEncoding(unittest.TestCase):
     def test_invalid_assignment(self):
         clauses = encode_cells(3)
 
-
         # First cell has both values 1 and 2
         true_variables = {1, 2}
         self.assertFalse(any(
             (literal > 0) == (abs(literal) in true_variables)
             for literal in [-1, -2]
         ))
+
+class TestRowColumnEncoding(unittest.TestCase):
+
+    def test_exactly_one(self):
+        self.assertEqual(exactly_one([1, 2, 3]), [
+            [1, 2, 3],
+            [-1, -2],
+            [-1, -3],
+            [-2, -3],
+        ])
+
+    def test_clause_counts(self):
+        for n in (2, 3, 4, 5):
+
+            expected = n * n * (1 + n * (n - 1) // 2)
+
+            self.assertEqual(len(encode_cells(n)), expected)
+            self.assertEqual(len(encode_rows(n)), expected)
+            self.assertEqual(len(encode_columns(n)), expected)
+
+    def test_valid_board(self):
+        board = [
+            [1, 2, 3],
+            [2, 3, 1],
+            [3, 1, 2],
+        ]
+
+        clauses = (encode_cells(3) + encode_rows(3) + encode_columns(3))
+
+        self.assertTrue(satisfies(clauses, board_assignment(board)))
+
+    def test_duplicate_in_row(self):
+        board = [
+            [1, 1, 1],
+            [2, 2, 2],
+            [3, 3, 3],
+        ]
+
+        assignment = board_assignment(board)
+
+        self.assertTrue(satisfies(encode_cells(3), assignment))
+        self.assertTrue(satisfies(encode_columns(3), assignment))
+        self.assertFalse(satisfies(encode_rows(3), assignment))
+
+    def test_duplicate_in_column(self):
+        board = [
+            [1, 2, 3],
+            [1, 2, 3],
+            [1, 2, 3],
+        ]
+
+        assignment = board_assignment(board)
+
+        self.assertTrue(satisfies(encode_cells(3), assignment))
+        self.assertTrue(satisfies(encode_rows(3), assignment))
+        self.assertFalse(satisfies(encode_columns(3), assignment))
+
+
+
 
 if __name__ == '__main__':
     unittest.main()
